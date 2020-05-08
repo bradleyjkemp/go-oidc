@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,9 +21,11 @@ const (
 	issuerGoogleAccounts         = "https://accounts.google.com"
 	issuerGoogleAccountsNoScheme = "accounts.google.com"
 
-	issuerMicrosoftAccountCommon       = "https://login.microsoftonline.com/common/v2.0"
-	issuerMicrosoftAccountCommonTenant = "https://login.microsoftonline.com/{tenantid}/v2.0"
+	issuerMicrosoftAccountCommon   = "https://login.microsoftonline.com/common/v2.0"
+	issuerMicrosoftAccountTenantID = "https://login.microsoftonline.com/{tenantid}/v2.0"
 )
+
+var issuerMicrosoftAccountCommonTenant = regexp.MustCompile("https://login\\.microsoftonline\\.com/({tenantid}|[a-zA-Z0-9-]+)/v2\\.0")
 
 // KeySet is a set of publc JSON Web Keys that can be used to validate the signature
 // of JSON web tokens. This is expected to be backed by a remote key set through
@@ -262,7 +265,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 		// Microsoft returns "https://login.microsoftonline.com/{tenant}/v2.0" instead of "https://login.microsoftonline.com/common/v2.0". Detect this case and allow it.
 		// vid. https://github.com/MicrosoftDocs/azure-docs/issues/38427
-		shouldSkipItsMicrosoftCommon := v.issuer == issuerMicrosoftAccountCommon && t.Issuer == issuerMicrosoftAccountCommonTenant
+		shouldSkipItsMicrosoftCommon := v.issuer == issuerMicrosoftAccountTenantID && issuerMicrosoftAccountCommonTenant.MatchString(t.Issuer)
 
 		if !(shouldSkipItsGoogle || shouldSkipItsMicrosoftCommon) {
 			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
